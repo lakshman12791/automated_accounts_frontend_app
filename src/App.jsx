@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listReceipts, uploadReceipt, deleteReceipt } from './api/receipts'
+import { listReceipts, uploadReceipt } from './api/receipts'
 import './App.css'
 
 function formatCurrency(amount, currency) {
@@ -97,13 +97,14 @@ function SearchBar({ query, onChange }) {
   )
 }
 
-function ReceiptsTable({ rows, onDelete }) {
+function ReceiptsTable({ rows }) {
   if (!rows.length) return <p className="read-the-docs">No receipts yet.</p>
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
+            <th style={{ textAlign: 'left', padding: '8px' }}>S.No.</th>
             <th style={{ textAlign: 'left', padding: '8px' }}>ID</th>
             <th style={{ textAlign: 'left', padding: '8px' }}>Merchant</th>
             <th style={{ textAlign: 'left', padding: '8px' }}>Purchased Date</th>
@@ -113,8 +114,9 @@ function ReceiptsTable({ rows, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r, index) => (
             <tr key={r.id} style={{ borderTop: '1px solid #333' }}>
+              <td style={{ padding: '8px' }}>{index + 1}</td>
               <td style={{ padding: '8px' }}>{r._id}</td>
               <td style={{ padding: '8px' }}>{r.merchant_name || '-'}</td>
               <td style={{ padding: '8px' }}>{r.purchased_at || '-'}</td>
@@ -137,16 +139,28 @@ function App() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Filter receipts based on search query
+  const filteredReceipts = receipts.filter(receipt => {
+    if (!query.trim()) return true
+    
+    const searchTerm = query.toLowerCase()
+    const merchantName = (receipt.merchant_name || '').toLowerCase()
+    const purchasedAt = (receipt.purchased_at || '').toLowerCase()
+    const totalAmount = String(receipt.total_amount || '').toLowerCase()
+    const createdAt = new Date(receipt.createdAt).toLocaleString().toLowerCase()
+    
+    return merchantName.includes(searchTerm) ||
+           purchasedAt.includes(searchTerm) ||
+           totalAmount.includes(searchTerm) ||
+           createdAt.includes(searchTerm)
+  })
+
   async function loadReceipts(signal) {
     setLoading(true)
     try {
-      const data = await listReceipts(query, { signal })
+      const data = await listReceipts('', { signal }) // Remove query parameter
       console.log("data 164", data)
-      setReceipts(Array.isArray(data?.
-        receiptsArray
-      ) ? data?.
-        receiptsArray
-        : [])
+      setReceipts(Array.isArray(data?.receiptsArray) ? data?.receiptsArray : [])
     } catch (_) {
       // ignore aborts/errors
     } finally {
@@ -160,27 +174,11 @@ function App() {
     return () => c.abort()
   }, [])
 
-  useEffect(() => {
-    const c = new AbortController()
-    const id = setTimeout(() => loadReceipts(c.signal), 300)
-    return () => {
-      clearTimeout(id)
-      c.abort()
-    }
-  }, [query])
-
   function handleUploaded(newRow) {
     setReceipts((prev) => [newRow, ...prev])
   }
 
-  async function handleDelete(row) {
-    const ok = window.confirm(`Delete receipt #${row.id}?`)
-    if (!ok) return
-    try {
-      await deleteReceipt(row.id)
-      setReceipts((prev) => prev.filter((r) => r.id !== row.id))
-    } catch (_) { }
-  }
+
 
   return (
     <>
@@ -190,7 +188,7 @@ function App() {
       {loading ? (
         <p>Loading…</p>
       ) : (
-        <ReceiptsTable rows={receipts} onDelete={handleDelete} />
+        <ReceiptsTable rows={filteredReceipts} />
       )}
     </>
   )
