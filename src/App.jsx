@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { listReceipts, uploadReceipt, deleteReceipt } from './api/receipts'
 import './App.css'
 
 function formatCurrency(amount, currency) {
@@ -30,21 +31,7 @@ function UploadForm({ onUploaded }) {
     setBusy(true)
 
     try {
-      const res = await fetch('/api/receipts/upload', {
-        method: 'POST',
-        body: form,
-      })
-
-      if (!res.ok) {
-        let msg = 'Upload failed'
-        try {
-          const errData = await res.json()
-          msg = errData.error || msg
-        } catch {}
-        throw new Error(msg)
-      }
-
-      const data = await res.json()
+      const data = await uploadReceipt(file)
       onUploaded?.(data)
 
       // Reset file input
@@ -119,10 +106,8 @@ function ReceiptsTable({ rows, onDelete }) {
           <tr>
             <th style={{ textAlign: 'left', padding: '8px' }}>ID</th>
             <th style={{ textAlign: 'left', padding: '8px' }}>Merchant</th>
-            <th style={{ textAlign: 'left', padding: '8px' }}>Date</th>
+            <th style={{ textAlign: 'left', padding: '8px' }}>Purchased Date</th>
             <th style={{ textAlign: 'left', padding: '8px' }}>Total</th>
-            <th style={{ textAlign: 'left', padding: '8px' }}>Currency</th>
-            <th style={{ textAlign: 'left', padding: '8px' }}>File</th>
             <th style={{ textAlign: 'left', padding: '8px' }}>Uploaded</th>
             <th></th>
           </tr>
@@ -130,32 +115,14 @@ function ReceiptsTable({ rows, onDelete }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} style={{ borderTop: '1px solid #333' }}>
-              <td style={{ padding: '8px' }}>{r.id}</td>
-              <td style={{ padding: '8px' }}>{r.merchant || '-'}</td>
-              <td style={{ padding: '8px' }}>{r.date || '-'}</td>
+              <td style={{ padding: '8px' }}>{r._id}</td>
+              <td style={{ padding: '8px' }}>{r.merchant_name || '-'}</td>
+              <td style={{ padding: '8px' }}>{r.purchased_at || '-'}</td>
               <td style={{ padding: '8px' }}>
-                {formatCurrency(r.total_amount, r.currency)}
-              </td>
-              <td style={{ padding: '8px' }}>{r.currency || '-'}</td>
-              <td style={{ padding: '8px' }}>
-                <a
-                  href={`/api/receipts/${r.id}/file`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {r.original_filename}
-                </a>
+                {formatCurrency(r.total_amount, "CAD")}
               </td>
               <td style={{ padding: '8px' }}>
-                {new Date(r.uploaded_at).toLocaleString()}
-              </td>
-              <td style={{ padding: '8px' }}>
-                <button
-                  onClick={() => onDelete(r)}
-                  style={{ background: '#3a3a3a' }}
-                >
-                  Delete
-                </button>
+                {new Date(r.createdAt).toLocaleString()}
               </td>
             </tr>
           ))}
@@ -173,13 +140,13 @@ function App() {
   async function loadReceipts(signal) {
     setLoading(true)
     try {
-      const url = query
-        ? `/api/receipts?q=${encodeURIComponent(query)}`
-        : '/api/receipts'
-
-      const res = await fetch(url, { signal })
-      const data = await res.json()
-      setReceipts(Array.isArray(data) ? data : [])
+      const data = await listReceipts(query, { signal })
+      console.log("data 164", data)
+      setReceipts(Array.isArray(data?.
+        receiptsArray
+      ) ? data?.
+        receiptsArray
+        : [])
     } catch (_) {
       // ignore aborts/errors
     } finally {
@@ -210,9 +177,9 @@ function App() {
     const ok = window.confirm(`Delete receipt #${row.id}?`)
     if (!ok) return
     try {
-      await fetch(`/api/receipts/${row.id}`, { method: 'DELETE' })
+      await deleteReceipt(row.id)
       setReceipts((prev) => prev.filter((r) => r.id !== row.id))
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return (
