@@ -4,7 +4,7 @@ import client from './client'
 export async function listReceipts(query, options = {}) {
   const params = {}
   if (query) params.q = query
-  const response = await client.get(`/receipts`, { params, signal: options.signal })
+  const response = await client.get(`/receipts`, { params })
   return response.data
 }
 

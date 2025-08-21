@@ -155,23 +155,23 @@ function App() {
            createdAt.includes(searchTerm)
   })
 
-  async function loadReceipts(signal) {
+  
+  async function loadReceipts() {
     setLoading(true)
     try {
-      const data = await listReceipts('', { signal }) // Remove query parameter
+      const data = await listReceipts('') // Remove signal parameter
       console.log("data 164", data)
       setReceipts(Array.isArray(data?.receiptsArray) ? data?.receiptsArray : [])
-    } catch (_) {
-      // ignore aborts/errors
+    } catch (error) {
+      console.error('Failed to load receipts:', error)
+      setReceipts([])
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    const c = new AbortController()
-    loadReceipts(c.signal)
-    return () => c.abort()
+    loadReceipts()
   }, [])
 
   function handleUploaded(newRow) {
