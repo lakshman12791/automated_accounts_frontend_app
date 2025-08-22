@@ -102,26 +102,39 @@ function UploadForm({ onUploaded }) {
   )
 }
 
-function ValidateForm({ receipts, onValidated }) {
-  const [selectedReceipt, setSelectedReceipt] = useState('')
+function ValidateForm({ onValidated }) {
+  const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [messageType, setMessageType] = useState('green')
+  const fileInputRef = useRef(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setSuccess('')
 
-    if (!selectedReceipt) return setError('Select a receipt to validate')
+    if (!file) return setError('Choose a PDF receipt to validate')
 
     setBusy(true)
 
     try {
-      const data = await validateReceipt(selectedReceipt)
-      setSuccess('Receipt validated successfully!')
+      const data = await validateReceipt(file)
+      console.log("onvalidate", data)
+      if (data?.isValid === false) {
+        setMessageType('red')
+        setSuccess(data?.message)
+      }
+      else {
+        setMessageType('red')
+        setSuccess(data?.message)
+      }
+      // setSuccess('Receipt validated successfully!')
       onValidated?.(data)
-      setSelectedReceipt('')
+
+      setFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
       setError(err.message || 'Validation failed')
     } finally {
@@ -133,52 +146,59 @@ function ValidateForm({ receipts, onValidated }) {
     <div className="operation-panel">
       <h2>Validate Receipt</h2>
       <form onSubmit={handleSubmit} className="validate-form">
-        <div className="select-container">
-          <label htmlFor="receipt-select">Select Receipt:</label>
-          <select
-            id="receipt-select"
-            value={selectedReceipt}
-            onChange={(e) => setSelectedReceipt(e.target.value)}
-            className="receipt-select"
-          >
-            <option value="">Choose a receipt...</option>
-            {receipts.map(receipt => (
-              <option key={receipt._id} value={receipt._id}>
-                {receipt.merchant_name || 'Unknown'} - {receipt._id}
-              </option>
-            ))}
-          </select>
+        <div className="file-input-container">
+          <input
+            id="validate-file-input"
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="file-input"
+          />
+          <label htmlFor="validate-file-input" className="file-input-label">
+            {file ? file.name : 'Choose PDF File'}
+          </label>
         </div>
-        <button type="submit" disabled={busy || !selectedReceipt} className="submit-btn">
-          {busy ? 'Validating...' : 'Validate Receipt'}
+        <button type="submit" disabled={busy || !file} className="submit-btn">
+          {busy ? 'Validating...' : 'Validate PDF'}
         </button>
         {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+        {/* {success && <div className="success-message">{success}</div>}
+         */}
+        {messageType === 'green' ? (
+          success && <div className="success-message">{success}</div>
+        ) : (
+          success && <div className="error-message">{success}</div>
+        )}
+
       </form>
     </div>
   )
 }
 
-function ProcessForm({ receipts, onProcessed }) {
-  const [selectedReceipt, setSelectedReceipt] = useState('')
+function ProcessForm({ onProcessed }) {
+  const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const fileInputRef = useRef(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setSuccess('')
 
-    if (!selectedReceipt) return setError('Select a receipt to process')
+    if (!file) return setError('Choose a PDF receipt to process')
 
     setBusy(true)
 
     try {
-      const data = await processReceipt(selectedReceipt)
+      const data = await processReceipt(file)
       setSuccess('Receipt processed successfully!')
       onProcessed?.(data)
-      setSelectedReceipt('')
+
+      setFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
       setError(err.message || 'Processing failed')
     } finally {
@@ -190,24 +210,21 @@ function ProcessForm({ receipts, onProcessed }) {
     <div className="operation-panel">
       <h2>Process Receipt</h2>
       <form onSubmit={handleSubmit} className="process-form">
-        <div className="select-container">
-          <label htmlFor="process-receipt-select">Select Receipt:</label>
-          <select
-            id="process-receipt-select"
-            value={selectedReceipt}
-            onChange={(e) => setSelectedReceipt(e.target.value)}
-            className="receipt-select"
-          >
-            <option value="">Choose a receipt...</option>
-            {receipts.map(receipt => (
-              <option key={receipt._id} value={receipt._id}>
-                {receipt.merchant_name || 'Unknown'} - {receipt._id}
-              </option>
-            ))}
-          </select>
+        <div className="file-input-container">
+          <input
+            id="process-file-input"
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="file-input"
+          />
+          <label htmlFor="process-file-input" className="file-input-label">
+            {file ? file.name : 'Choose PDF File'}
+          </label>
         </div>
-        <button type="submit" disabled={busy || !selectedReceipt} className="submit-btn">
-          {busy ? 'Processing...' : 'Process Receipt'}
+        <button type="submit" disabled={busy || !file} className="submit-btn">
+          {busy ? 'Processing...' : 'Process PDF'}
         </button>
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">{success}</div>}
@@ -231,7 +248,7 @@ function SearchBar({ query, onChange }) {
 
 function ReceiptsTable({ rows }) {
   if (!rows.length) return <p className="no-receipts">No receipts found.</p>
-  
+
   return (
     <div className="table-container">
       <table className="receipts-table">
@@ -277,17 +294,17 @@ function App() {
   // Filter receipts based on search query
   const filteredReceipts = receipts.filter(receipt => {
     if (!query.trim()) return true
-    
+
     const searchTerm = query.toLowerCase()
     const merchantName = (receipt.merchant_name || '').toLowerCase()
     const purchasedAt = (receipt.purchased_at || '').toLowerCase()
     const totalAmount = String(receipt.total_amount || '').toLowerCase()
     const createdAt = new Date(receipt.createdAt).toLocaleString().toLowerCase()
-    
+
     return merchantName.includes(searchTerm) ||
-           purchasedAt.includes(searchTerm) ||
-           totalAmount.includes(searchTerm) ||
-           createdAt.includes(searchTerm)
+      purchasedAt.includes(searchTerm) ||
+      totalAmount.includes(searchTerm) ||
+      createdAt.includes(searchTerm)
   })
 
   async function loadReceipts() {
@@ -327,9 +344,9 @@ function App() {
       case 'upload':
         return <UploadForm onUploaded={handleUploaded} />
       case 'validate':
-        return <ValidateForm receipts={receipts} onValidated={handleValidated} />
+        return <ValidateForm onValidated={handleValidated} />
       case 'process':
-        return <ProcessForm receipts={receipts} onProcessed={handleProcessed} />
+        return <ProcessForm onProcessed={handleProcessed} />
       case 'get':
         return (
           <div className="operation-panel">
@@ -353,13 +370,13 @@ function App() {
         <h1>📊 Receipt Management System</h1>
         <p className="app-subtitle">Manage your receipts with ease</p>
       </header>
-      
+
       <main className="app-main">
-        <OperationSelector 
-          selectedOperation={selectedOperation} 
-          onOperationChange={setSelectedOperation} 
+        <OperationSelector
+          selectedOperation={selectedOperation}
+          onOperationChange={setSelectedOperation}
         />
-        
+
         {renderOperationPanel()}
       </main>
     </div>

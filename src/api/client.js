@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const apiUrl = 'http://localhost:3002/api/documents'
+const apiUrl = 'http://localhost:3002/api'
 
 
 // Reusable Axios instance
