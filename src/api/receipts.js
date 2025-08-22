@@ -1,6 +1,5 @@
 import client from './client'
 
-
 export async function listReceipts(query, options = {}) {
   const params = {}
   if (query) params.q = query
@@ -17,8 +16,19 @@ export async function uploadReceipt(file) {
   return response.data
 }
 
-export async function deleteReceipt(id) {
-  await client.delete(`/receipts/${id}`)
+export async function validateReceipt(id) {
+  const response = await client.post(`/receipts/${id}/validate`)
+  return response.data
+}
+
+export async function processReceipt(id) {
+  const response = await client.post(`/receipts/${id}/process`)
+  return response.data
+}
+
+export async function getReceipt(id) {
+  const response = await client.get(`/receipts/${id}`)
+  return response.data
 }
 
 
