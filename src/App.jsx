@@ -14,6 +14,43 @@ function formatCurrency(amount, currency) {
   }
 }
 
+
+function ProcessComponentUI({ responseData, messageType }) {
+
+  if (messageType !== 'green' || !responseData) return null;
+
+  const { isProcessed, message, result } = responseData;
+
+  return (
+    <div className="json-display">
+      <div className="row">
+        <span className="label">Status:</span>
+        <span className="value">{isProcessed ? 'true' : 'false'}</span>
+      </div>
+      <div className="row">
+        <span className="label">Message:</span>
+        <span className="value">{message}</span>
+      </div>
+      {result && (
+        <>
+          <div className="row">
+            <span className="label">Merchant Name:</span>
+            <span className="value">{result.merchant_name}</span>
+          </div>
+          <div className="row">
+            <span className="label">Receipt Date:</span>
+            <span className="value">{result.receipt_date}</span>
+          </div>
+          <div className="row">
+            <span className="label">Amount:</span>
+            <span className="value">{result.amount}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function OperationSelector({ selectedOperation, onOperationChange }) {
   const operations = [
     { value: 'upload', label: '📄 Upload Document', description: 'Upload a new PDF receipt' },
@@ -181,7 +218,11 @@ function ProcessForm({ onProcessed }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [messageType, setMessageType] = useState('green')
+  const [responseData, setResponseData] = useState(null)
   const fileInputRef = useRef(null)
+
+  console.log("messageType", messageType)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -194,13 +235,26 @@ function ProcessForm({ onProcessed }) {
 
     try {
       const data = await processReceipt(file)
-      setSuccess('Receipt processed successfully!')
+      if (data?.isProcessed) {
+        setMessageType('green')
+        setSuccess(data?.message || 'Receipt processed successfully!')
+        setError('')
+        setResponseData(data)
+      } else {
+        setMessageType('red')
+        setError(data?.message || 'Processing failed')
+        setSuccess('')
+        setResponseData(null)
+      }
       onProcessed?.(data)
 
       setFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
+      setMessageType('red')
       setError(err.message || 'Processing failed')
+      setSuccess('')
+      setResponseData(null)
     } finally {
       setBusy(false)
     }
@@ -226,8 +280,18 @@ function ProcessForm({ onProcessed }) {
         <button type="submit" disabled={busy || !file} className="submit-btn">
           {busy ? 'Processing...' : 'Process PDF'}
         </button>
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
+        {messageType === 'green' ? (
+          success && <div className="success-message">{success}</div>
+        ) : (
+          error && <div className="error-message">{error}</div>
+        )}
+        {messageType === 'green' && responseData && (
+          <>
+            <ProcessComponentUI responseData={responseData} messageType={messageType} />
+
+          </>
+          // <pre className="json-output">{JSON.stringify(responseData, null, 2)}</pre>
+        )}
       </form>
     </div>
   )
@@ -246,7 +310,7 @@ function SearchBar({ query, onChange }) {
   )
 }
 
-function ReceiptsTable({ rows }) {
+function ReceiptsTable({ rows, onView, loadingId }) {
   if (!rows.length) return <p className="no-receipts">No receipts found.</p>
 
   return (
@@ -260,7 +324,7 @@ function ReceiptsTable({ rows }) {
             <th>Purchased Date</th>
             <th>Total</th>
             <th>Uploaded</th>
-            <th>Status</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -273,9 +337,13 @@ function ReceiptsTable({ rows }) {
               <td className="amount">{formatCurrency(r.total_amount, "CAD")}</td>
               <td>{new Date(r.createdAt).toLocaleString()}</td>
               <td>
-                <span className={`status-badge ${r.status || 'pending'}`}>
-                  {r.status || 'Pending'}
-                </span>
+                <button
+                  className="submit-btn submit-btn--sm"
+                  onClick={() => onView?.(r._id)}
+                  disabled={loadingId === r._id}
+                >
+                  {loadingId === r._id ? 'Loading...' : 'View'}
+                </button>
               </td>
             </tr>
           ))}
@@ -285,11 +353,32 @@ function ReceiptsTable({ rows }) {
   )
 }
 
+function Modal({ open, onClose, title, children }) {
+  if (!open) return null
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">{title}</h3>
+          <button className="modal-close" aria-label="Close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [receipts, setReceipts] = useState([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [selectedOperation, setSelectedOperation] = useState('upload')
+  const [selectedReceipt, setSelectedReceipt] = useState(null)
+  const [viewLoadingId, setViewLoadingId] = useState(null)
+  const [viewError, setViewError] = useState('')
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
   // Filter receipts based on search query
   const filteredReceipts = receipts.filter(receipt => {
@@ -339,6 +428,81 @@ function App() {
     loadReceipts()
   }
 
+  async function handleViewReceipt(id) {
+    setViewError('')
+    setViewLoadingId(id)
+    try {
+      const data = await getReceipt(id)
+      // Support either { receipt: {...} } or direct object
+      setSelectedReceipt(data?.receiptDetails || data || null)
+      setIsDetailsOpen(true)
+    } catch (err) {
+      setViewError(err.message || 'Failed to fetch receipt')
+      setSelectedReceipt(null)
+    } finally {
+      setViewLoadingId(null)
+    }
+  }
+
+  function renderReceiptDetails() {
+    if (!selectedReceipt) return null
+
+    const receipt = selectedReceipt
+    const items = Array.isArray(receipt.items) ? receipt.items : receipt.line_items
+
+    return (
+      <div className="json-display">
+        <div className="row">
+          <span className="label">ID:</span>
+          <span className="value">{receipt._id || '-'}</span>
+        </div>
+        <div className="row">
+          <span className="label">Merchant Name:</span>
+          <span className="value">{receipt.merchant_name || '-'}</span>
+        </div>
+        <div className="row">
+          <span className="label">Purchased Date:</span>
+          <span className="value">{receipt.purchased_at || receipt.receipt_date || '-'}</span>
+        </div>
+        <div className="row">
+          <span className="label">Total Amount:</span>
+          <span className="value">{formatCurrency(receipt.total_amount ?? receipt.amount, 'CAD')}</span>
+        </div>
+        {items && items.length > 0 && (
+          <div className="row">
+            <span className="label">Items:</span>
+            <span className="value" style={{ display: 'block', width: '100%' }}>
+              <div className="table-container">
+                <table className="receipts-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Description</th>
+                      <th>Qty</th>
+                      <th>Unit Price</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((it, idx) => (
+                      <tr key={idx}>
+                        <td>{idx + 1}</td>
+                        <td>{it.description || it.name || '-'}</td>
+                        <td>{it.quantity ?? it.qty ?? '-'}</td>
+                        <td>{formatCurrency(it.unit_price ?? it.price, 'CAD')}</td>
+                        <td>{formatCurrency(it.amount ?? it.total, 'CAD')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </span>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   function renderOperationPanel() {
     switch (selectedOperation) {
       case 'upload':
@@ -355,7 +519,10 @@ function App() {
             {loading ? (
               <div className="loading">Loading receipts...</div>
             ) : (
-              <ReceiptsTable rows={filteredReceipts} />
+              <>
+                <ReceiptsTable rows={filteredReceipts} onView={handleViewReceipt} loadingId={viewLoadingId} />
+                {viewError && <div className="error-message" style={{ marginTop: 12 }}>{viewError}</div>}
+              </>
             )}
           </div>
         )
@@ -379,6 +546,14 @@ function App() {
 
         {renderOperationPanel()}
       </main>
+
+      <Modal
+        open={isDetailsOpen}
+        onClose={() => { setIsDetailsOpen(false); }}
+        title="Receipt Details"
+      >
+        {renderReceiptDetails()}
+      </Modal>
     </div>
   )
 }

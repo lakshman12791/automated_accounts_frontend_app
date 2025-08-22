@@ -34,8 +34,8 @@ export async function processReceipt(file) {
   return response.data
 }
 
-export async function getReceipt(id) {
-  const response = await client.get(`/receipts/${id}`)
+export async function getReceipt(receiptId) {
+  const response = await client.get(`/receipts/get-receipt-detail/${receiptId}`)
   return response.data
 }
 
