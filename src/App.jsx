@@ -164,7 +164,7 @@ function ValidateForm({ onValidated }) {
         setSuccess(data?.message)
       }
       else {
-        setMessageType('red')
+        setMessageType('green')
         setSuccess(data?.message)
       }
       // setSuccess('Receipt validated successfully!')
@@ -535,7 +535,7 @@ function App() {
     <div className="app-container">
       <header className="app-header">
         <h1>📊 Receipt Management System</h1>
-        <p className="app-subtitle">Manage your receipts with ease</p>
+        <p className="app-subtitle">Manage your receipts here</p>
       </header>
 
       <main className="app-main">

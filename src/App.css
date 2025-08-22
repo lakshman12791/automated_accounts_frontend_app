@@ -426,7 +426,7 @@ body {
   margin-top: 16px;
   border-radius: 8px;
   background-color: #f7f9fc;
-  max-width: 400px;
+  /* max-width: 400px; */
   font-family: Arial, sans-serif;
 }
 
